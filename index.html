@@ -3,292 +3,198 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DentalPro | Asistente Virtual 360</title>
-    
+    <title>DentalPro | Expedientes Clínicos</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
-    
     <style>
-        body { font-family: 'Inter', sans-serif; }
-        .diente {
-            width: 40px; height: 50px; border: 1px solid #cbd5e1;
-            display: flex; flex-direction: column; align-items: center;
-            justify-content: center; cursor: pointer; font-size: 11px;
-            transition: all 0.2s; border-radius: 6px; font-weight: bold;
-        }
-        .diente:hover { transform: scale(1.05); }
+        [x-cloak] { display: none !important; }
+        .diente { width: 32px; height: 42px; border: 1px solid #cbd5e1; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 10px; border-radius: 4px; font-weight: bold; transition: 0.2s; }
         .estado-sano { background-color: #f0fdf4; border-color: #22c55e; color: #166534; }
         .estado-caries { background-color: #fef2f2; border-color: #ef4444; color: #991b1b; }
         .estado-tratado { background-color: #eff6ff; border-color: #3b82f6; color: #1e40af; }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-800" x-data="dentalApp()">
+<body class="bg-slate-100" x-data="dentalApp()" x-init="init()">
 
     <div class="flex min-h-screen">
-        <nav class="w-64 bg-slate-900 text-white p-6 flex flex-col shadow-xl">
-            <div class="mb-10 text-center">
-                <h1 class="text-2xl font-bold text-blue-400">🦷 DentalPro</h1>
-                <p class="text-xs text-slate-400 mt-1">Tu clínica en la nube</p>
-            </div>
-            
-            <ul class="space-y-2 flex-1">
-                <li @click="view = 'agenda'" :class="view === 'agenda' ? 'bg-blue-600' : ''" class="p-3 rounded-lg cursor-pointer hover:bg-slate-800 transition">📅 Agenda del Día</li>
-                <li @click="view = 'pacientes'" :class="view === 'pacientes' ? 'bg-blue-600' : ''" class="p-3 rounded-lg cursor-pointer hover:bg-slate-800 transition">👥 Mis Pacientes</li>
-                <li @click="view = 'recetas'" :class="view === 'recetas' ? 'bg-blue-600' : ''" class="p-3 rounded-lg cursor-pointer hover:bg-slate-800 transition">📄 Emitir Recetas</li>
-                <li @click="view = 'inventario'" :class="view === 'inventario' ? 'bg-blue-600' : ''" class="p-3 rounded-lg cursor-pointer hover:bg-slate-800 transition">📦 Inventario de Clínica</li>
+        <nav class="w-64 bg-slate-900 text-white p-6 shadow-xl flex flex-col">
+            <h1 class="text-2xl font-bold text-blue-400 mb-8 text-center">🦷 DentalPro</h1>
+            <ul class="space-y-3 flex-1">
+                <li @click="view = 'pacientes'; pacienteSeleccionado = null" :class="view === 'pacientes' ? 'bg-blue-600' : ''" class="p-3 rounded-lg cursor-pointer hover:bg-slate-800 transition">👥 Lista de Pacientes</li>
+                <li @click="view = 'agenda'" :class="view === 'agenda' ? 'bg-blue-600' : ''" class="p-3 rounded-lg cursor-pointer hover:bg-slate-800 transition">📅 Agenda Global</li>
+                <li @click="view = 'inventario'" :class="view === 'inventario' ? 'bg-blue-600' : ''" class="p-3 rounded-lg cursor-pointer hover:bg-slate-800 transition">📦 Inventario</li>
             </ul>
-            
-            <div class="mt-auto">
-                <button @click="borrarMemoria()" class="w-full text-xs bg-red-900 text-red-300 p-2 rounded hover:bg-red-800 transition">
-                    ⚠️ Borrar todos los datos
-                </button>
-            </div>
         </nav>
 
-        <main class="flex-1 p-8 overflow-y-auto">
+        <main class="flex-1 p-8">
             
-            <template x-if="view === 'agenda'">
-                <div class="animate-fadeIn">
-                    <div class="flex justify-between items-center mb-8">
-                        <h2 class="text-3xl font-bold">Citas de Hoy</h2>
-                        <button @click="agregarCita()" class="bg-blue-600 text-white px-5 py-2 rounded-lg font-semibold hover:bg-blue-700">+ Nueva Cita</button>
+            <template x-if="view === 'pacientes' && !pacienteSeleccionado">
+                <div x-cloak>
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-3xl font-bold text-slate-800">Expedientes Clínicos</h2>
+                        <button @click="nuevoPaciente()" class="bg-blue-600 text-white px-6 py-2 rounded-full font-bold hover:bg-blue-700 shadow-lg">+ Registrar Nuevo Paciente</button>
                     </div>
                     
-                    <template x-if="citas.length === 0">
-                        <p class="text-slate-500 italic">No hay citas programadas para hoy.</p>
-                    </template>
-
-                    <div class="grid gap-4">
-                        <template x-for="(cita, index) in citas" :key="index">
-                            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center hover:shadow-md transition">
-                                <div>
-                                    <span class="text-blue-600 font-bold text-lg" x-text="cita.hora"></span>
-                                    <h3 class="font-semibold text-slate-800 text-xl" x-text="cita.paciente"></h3>
-                                    <p class="text-sm text-slate-500" x-text="cita.motivo"></p>
-                                </div>
-                                <div class="flex gap-2">
-                                    <button @click="eliminarCita(index)" class="text-red-500 bg-red-50 px-3 py-2 rounded-lg text-sm font-bold hover:bg-red-100">✕ Cancelar</button>
-                                </div>
-                            </div>
-                        </template>
-                    </div>
-                </div>
-            </template>
-
-            <template x-if="view === 'pacientes'">
-                <div class="animate-fadeIn">
-                    <h2 class="text-3xl font-bold mb-8">Expediente y Odontograma</h2>
-                    
-                    <div class="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 mb-8">
-                        <div class="flex justify-between items-end mb-6">
-                            <div>
-                                <h3 class="text-xl font-bold">Registro Dental</h3>
-                                <p class="text-sm text-slate-500 italic">Los cambios se guardan automáticamente.</p>
-                            </div>
-                            <div class="flex gap-3 text-xs font-semibold uppercase tracking-wider">
-                                <span class="flex items-center gap-1"><div class="w-3 h-3 bg-green-500 rounded"></div> Sano</span>
-                                <span class="flex items-center gap-1"><div class="w-3 h-3 bg-red-500 rounded"></div> Caries</span>
-                                <span class="flex items-center gap-1"><div class="w-3 h-3 bg-blue-500 rounded"></div> Tratado</span>
-                            </div>
-                        </div>
-
-                        <div class="flex flex-wrap gap-2 justify-center mb-10 pb-6 border-b border-slate-100">
-                            <template x-for="d in dientesSup" :key="d.id">
-                                <div @click="toggleDiente(d)" :class="d.estado" class="diente" x-text="d.id"></div>
-                            </template>
-                        </div>
-                        <div class="flex flex-wrap gap-2 justify-center">
-                            <template x-for="d in dientesInf" :key="d.id">
-                                <div @click="toggleDiente(d)" :class="d.estado" class="diente" x-text="d.id"></div>
-                            </template>
-                        </div>
-                    </div>
-                </div>
-            </template>
-
-            <template x-if="view === 'recetas'">
-                <div class="max-w-2xl mx-auto bg-white p-10 rounded-2xl shadow-lg border border-slate-200">
-                    <h2 class="text-2xl font-bold mb-6 text-center text-blue-600 border-b pb-4">Generador de Recetas Médicas</h2>
-                    <div class="space-y-4">
-                        <div>
-                            <label class="block text-sm font-bold mb-1">Nombre del Paciente</label>
-                            <input x-model="recetaData.nombre" type="text" class="w-full p-3 border rounded-lg bg-slate-50" placeholder="Ej. Ana Martínez">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-bold mb-1">Prescripción</label>
-                            <textarea x-model="recetaData.texto" rows="6" class="w-full p-3 border rounded-lg bg-slate-50" placeholder="Ej. Amoxicilina 500mg cada 8 horas..."></textarea>
-                        </div>
-                        <button @click="descargarPDF()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-xl hover:bg-blue-700 transition shadow-lg">
-                            💾 Generar y Descargar PDF
-                        </button>
-                    </div>
-                </div>
-            </template>
-
-            <template x-if="view === 'inventario'">
-                <div>
-                    <div class="flex justify-between items-center mb-8">
-                        <h2 class="text-3xl font-bold">Control de Insumos</h2>
-                        <button @click="agregarInventario()" class="bg-blue-600 text-white px-5 py-2 rounded-lg font-semibold hover:bg-blue-700">+ Añadir Producto</button>
-                    </div>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <template x-for="(item, index) in inventario" :key="index">
-                            <div class="bg-white p-6 rounded-xl border border-slate-200 flex flex-col shadow-sm">
-                                <div class="flex justify-between items-start mb-4">
-                                    <h4 class="font-bold text-lg" x-text="item.nombre"></h4>
-                                    <button @click="eliminarInventario(index)" class="text-slate-300 hover:text-red-500">✕</button>
-                                </div>
-                                <div class="mt-auto flex justify-between items-center">
-                                    <p class="text-sm text-slate-500">Stock: <span class="font-bold text-blue-600 text-lg" x-text="item.cantidad"></span></p>
-                                    <div class="flex gap-2">
-                                        <button @click="restarStock(item)" class="bg-red-100 text-red-700 w-8 h-8 rounded font-bold hover:bg-red-200">-</button>
-                                        <button @click="sumarStock(item)" class="bg-green-100 text-green-700 w-8 h-8 rounded font-bold hover:bg-green-200">+</button>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <template x-for="(p, index) in pacientes" :key="index">
+                            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition cursor-pointer" @click="abrirExpediente(index)">
+                                <div class="flex items-center gap-4 mb-4">
+                                    <div class="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-xl" x-text="p.nombre[0]"></div>
+                                    <div>
+                                        <h3 class="font-bold text-lg text-slate-800" x-text="p.nombre"></h3>
+                                        <p class="text-sm text-slate-500" x-text="p.telefono"></p>
                                     </div>
                                 </div>
+                                <div class="flex justify-between items-center text-xs text-slate-400 border-t pt-4">
+                                    <span x-text="'ID: ' + p.id"></span>
+                                    <span class="text-blue-600 font-semibold">Ver Folder →</span>
+                                </div>
                             </div>
                         </template>
                     </div>
                 </div>
             </template>
 
-        </main>
+            <template x-if="pacienteSeleccionado !== null">
+                <div x-cloak class="animate-fadeIn">
+                    <button @click="pacienteSeleccionado = null" class="mb-4 text-blue-600 font-semibold hover:underline">← Volver a la lista</button>
+                    
+                    <div class="bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-200">
+                        <div class="bg-slate-50 p-8 border-b border-slate-200 flex justify-between items-center">
+                            <div>
+                                <h2 class="text-4xl font-bold text-slate-800" x-text="pacientes[pacienteSeleccionado].nombre"></h2>
+                                <p class="text-slate-500">📞 <span x-text="pacientes[pacienteSeleccionado].telefono"></span> | 📧 <span x-text="pacientes[pacienteSeleccionado].correo"></span></p>
+                            </div>
+                            <button @click="eliminarPaciente(pacienteSeleccionado)" class="bg-red-50 text-red-500 px-4 py-2 rounded-lg text-xs font-bold hover:bg-red-100">Eliminar Expediente</button>
+                        </div>
+
+                        <div class="grid grid-cols-1 lg:grid-cols-3">
+                            <div class="lg:col-span-2 p-8 border-r border-slate-100">
+                                <h3 class="font-bold text-xl mb-6 text-slate-700">Odontograma del Paciente</h3>
+                                <div class="bg-slate-50 p-6 rounded-2xl mb-8">
+                                    <div class="flex flex-wrap gap-2 justify-center mb-6">
+                                        <template x-for="d in pacientes[pacienteSeleccionado].odontograma.sup">
+                                            <div @click="toggleDiente(d)" :class="d.estado" class="diente" x-text="d.id"></div>
+                                        </template>
+                                    </div>
+                                    <div class="flex flex-wrap gap-2 justify-center">
+                                        <template x-for="d in pacientes[pacienteSeleccionado].odontograma.inf">
+                                            <div @click="toggleDiente(d)" :class="d.estado" class="diente" x-text="d.id"></div>
+                                        </template>
+                                    </div>
+                                </div>
+
+                                <h3 class="font-bold text-xl mb-4 text-slate-700">Notas Médicas / Evolución</h3>
+                                <textarea x-model="pacientes[pacienteSeleccionado].notas" @input="guardar()" class="w-full p-4 bg-yellow-50 border-none rounded-xl text-slate-700 shadow-inner" rows="5" placeholder="Escribe aquí el historial clínico, alergias o evolución..."></textarea>
+                            </div>
+
+                            <div class="p-8 bg-slate-50/50">
+                                <h3 class="font-bold text-xl mb-6 text-slate-700">📄 Recetas Generadas</h3>
+                                <div class="space-y-4 mb-6">
+                                    <template x-for="(receta, rIndex) in pacientes[pacienteSeleccionado].recetas" :key="rIndex">
+                                        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex justify-between items-center">
+                                            <div>
+                                                <p class="text-sm font-bold text-slate-700" x-text="receta.fecha"></p>
+                                                <p class="text-xs text-slate-500 truncate w-32" x-text="receta.texto"></p>
+                                            </div>
+                                            <button @click="descargarPDF(receta, pacientes[pacienteSeleccionado].nombre)" class="text-blue-600 hover:text-blue-800 text-xl">📥</button>
+                                        </div>
+                                    </template>
+                                </div>
+                                <button @click="crearReceta()" class="w-full bg-slate-800 text-white py-3 rounded-xl font-bold hover:bg-slate-700">+ Nueva Receta</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </template>
+            
+            </main>
     </div>
 
     <script>
         function dentalApp() {
             return {
-                view: 'agenda', 
-                
-                // Variables de datos (se llenarán con datos locales si existen)
-                citas: [],
-                inventario: [],
-                dientesSup: [],
-                dientesInf: [],
-                recetaData: { nombre: '', texto: '' },
+                view: 'pacientes',
+                pacientes: [],
+                pacienteSeleccionado: null,
 
-                // 1. INICIALIZACIÓN (Cargar la memoria)
                 init() {
-                    const datosGuardados = localStorage.getItem('dentalProData');
+                    const saved = localStorage.getItem('dentalPro_v3');
+                    if (saved) {
+                        this.pacientes = JSON.parse(saved);
+                    }
+                },
+
+                guardar() {
+                    localStorage.setItem('dentalPro_v3', JSON.stringify(this.pacientes));
+                },
+
+                nuevoPaciente() {
+                    const nombre = prompt("Nombre completo del paciente:");
+                    if (!nombre) return;
+                    const telefono = prompt("Teléfono:");
+                    const correo = prompt("Correo electrónico:");
                     
-                    if (datosGuardados) {
-                        // Si hay datos guardados, los usamos
-                        const datos = JSON.parse(datosGuardados);
-                        this.citas = datos.citas;
-                        this.inventario = datos.inventario;
-                        this.dientesSup = datos.dientesSup;
-                        this.dientesInf = datos.dientesInf;
-                    } else {
-                        // Si es la primera vez que entra, cargamos datos de ejemplo
-                        this.citas = [
-                            { hora: '09:00', paciente: 'Laura Gómez', motivo: 'Limpieza Profunda' },
-                            { hora: '11:30', paciente: 'Carlos Ruiz', motivo: 'Extracción Molar' }
-                        ];
-                        this.inventario = [
-                            { nombre: 'Cartuchos Anestesia', cantidad: 45 },
-                            { nombre: 'Resina Compuesta A2', cantidad: 8 }
-                        ];
-                        this.dientesSup = [18,17,16,15,14,13,12,11,21,22,23,24,25,26,27,28].map(n => ({id: n, estado: 'estado-sano'}));
-                        this.dientesInf = [48,47,46,45,44,43,42,41,31,32,33,34,35,36,37,38].map(n => ({id: n, estado: 'estado-sano'}));
-                        this.guardarDatos();
-                    }
-                },
-
-                // 2. FUNCIÓN PARA GUARDAR EN MEMORIA
-                guardarDatos() {
-                    const datos = {
-                        citas: this.citas,
-                        inventario: this.inventario,
-                        dientesSup: this.dientesSup,
-                        dientesInf: this.dientesInf
+                    const nuevo = {
+                        id: Date.now().toString().slice(-5),
+                        nombre,
+                        telefono: telefono || 'Sin teléfono',
+                        correo: correo || 'Sin correo',
+                        notas: '',
+                        recetas: [],
+                        odontograma: {
+                            sup: [18,17,16,15,14,13,12,11,21,22,23,24,25,26,27,28].map(n => ({id: n, estado: 'estado-sano'})),
+                            inf: [48,47,46,45,44,43,42,41,31,32,33,34,35,36,37,38].map(n => ({id: n, estado: 'estado-sano'}))
+                        }
                     };
-                    localStorage.setItem('dentalProData', JSON.stringify(datos));
+                    
+                    this.pacientes.push(nuevo);
+                    this.guardar();
                 },
 
-                // 3. FUNCIONES DE AGENDA
-                agregarCita() {
-                    const paciente = prompt("Nombre del paciente:");
-                    if (!paciente) return;
-                    const hora = prompt("Hora (Ej. 16:00):");
-                    const motivo = prompt("Motivo de la consulta:");
-                    this.citas.push({ hora, paciente, motivo });
-                    this.guardarDatos();
-                },
-                eliminarCita(index) {
-                    if(confirm("¿Seguro que deseas cancelar esta cita?")) {
-                        this.citas.splice(index, 1);
-                        this.guardarDatos();
-                    }
+                abrirExpediente(index) {
+                    this.pacienteSeleccionado = index;
                 },
 
-                // 4. FUNCIONES DE ODONTOGRAMA
                 toggleDiente(diente) {
                     const estados = ['estado-sano', 'estado-caries', 'estado-tratado'];
                     let actual = estados.indexOf(diente.estado);
                     diente.estado = estados[(actual + 1) % estados.length];
-                    this.guardarDatos(); // Guardar al cambiar color
+                    this.guardar();
                 },
 
-                // 5. FUNCIONES DE INVENTARIO
-                agregarInventario() {
-                    const nombre = prompt("Nombre del nuevo insumo:");
-                    if (!nombre) return;
-                    const cantidad = parseInt(prompt("Cantidad inicial:"));
-                    this.inventario.push({ nombre, cantidad: cantidad || 0 });
-                    this.guardarDatos();
-                },
-                eliminarInventario(index) {
-                    if(confirm("¿Eliminar este producto del inventario?")) {
-                        this.inventario.splice(index, 1);
-                        this.guardarDatos();
-                    }
-                },
-                sumarStock(item) {
-                    item.cantidad++;
-                    this.guardarDatos();
-                },
-                restarStock(item) {
-                    if(item.cantidad > 0) item.cantidad--;
-                    this.guardarDatos();
+                crearReceta() {
+                    const texto = prompt("Escriba la prescripción médica:");
+                    if (!texto) return;
+                    const fecha = new Date().toLocaleDateString();
+                    this.pacientes[this.pacienteSeleccionado].recetas.unshift({ fecha, texto });
+                    this.guardar();
                 },
 
-                // 6. FUNCIONES DEL SISTEMA
-                borrarMemoria() {
-                    if(confirm("⚠️ ATENCIÓN: Esto borrará TODOS los pacientes, citas e inventario. ¿Estás seguro?")) {
-                        localStorage.removeItem('dentalProData');
-                        location.reload(); // Recargar la página
+                eliminarPaciente(index) {
+                    if(confirm("¿Seguro que deseas borrar TODO el expediente de este paciente?")) {
+                        this.pacientes.splice(index, 1);
+                        this.pacienteSeleccionado = null;
+                        this.guardar();
                     }
                 },
 
-                // 7. PDF
-                descargarPDF() {
-                    if(!this.recetaData.nombre) return alert('Por favor ingresa el nombre del paciente.');
+                descargarPDF(receta, nombrePaciente) {
                     const doc = document.createElement('div');
                     doc.innerHTML = `
-                        <div style="padding: 40px; font-family: sans-serif; border: 8px solid #f1f5f9;">
-                            <div style="text-align: center; border-bottom: 2px solid #1e40af; padding-bottom: 20px; margin-bottom: 30px;">
-                                <h1 style="color: #1e40af; margin: 0; font-size: 24px;">CENTRO ODONTOLÓGICO ESPECIALIZADO</h1>
-                            </div>
-                            <div style="margin-bottom: 30px;">
-                                <p><strong>Paciente:</strong> ${this.recetaData.nombre}</p>
-                                <p><strong>Fecha:</strong> ${new Date().toLocaleDateString()}</p>
-                            </div>
-                            <div style="min-height: 250px;">
-                                <h3 style="color: #1e40af;">Prescripción:</h3>
-                                <p style="white-space: pre-wrap; line-height: 1.6;">${this.recetaData.texto}</p>
-                            </div>
-                            <div style="margin-top: 60px; text-align: center;">
-                                <div style="width: 200px; border-top: 1px solid black; margin: 0 auto; padding-top: 10px;">
-                                    <strong>Firma del Odontólogo</strong>
-                                </div>
+                        <div style="padding: 40px; font-family: sans-serif;">
+                            <h1 style="color: #1e40af; border-bottom: 2px solid #1e40af;">RECETA MÉDICA ODONTOLÓGICA</h1>
+                            <p><strong>Paciente:</strong> ${nombrePaciente}</p>
+                            <p><strong>Fecha:</strong> ${receta.fecha}</p>
+                            <div style="margin-top: 40px; padding: 20px; background: #f8fafc; border-radius: 10px;">
+                                <h3>Rp:</h3>
+                                <p style="white-space: pre-wrap;">${receta.texto}</p>
                             </div>
                         </div>
                     `;
-                    html2pdf().set({
-                        margin: 1, filename: `Receta_${this.recetaData.nombre}.pdf`,
-                        jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
-                    }).from(doc).save();
+                    html2pdf().from(doc).save(`Receta_${nombrePaciente}_${receta.fecha}.pdf`);
                 }
             }
         }
